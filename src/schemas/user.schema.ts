@@ -1,0 +1,13 @@
+import { z } from "zod";
+
+export const createUserSchema = z.object({
+  username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9]+$/),
+  email: z.string().email(),
+  bio: z.string().min(10).max(500).optional(),
+  about: z.string().min(10).max(500).optional(),
+  avatar: z.string().url().optional(),
+  tags: z.array(z.string()).optional(),
+  passingYear: z.number().nullable().optional(),
+  skillsRequired: z.array(z.string()).optional(),
+  skillsOffered: z.array(z.string()).optional(),
+});
