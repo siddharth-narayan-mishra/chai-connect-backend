@@ -15,7 +15,7 @@ export const creditTransactionSchema = z.object({
     .min(1, "Amount must be at least 1"),
 
   type: z.enum(["exchange", "bonus", "refund", "penalty"], {
-    required_error: "Transaction type is required",
+    error: "Transaction type is required",
   }),
 
   relatedExchange: objectId.optional(),

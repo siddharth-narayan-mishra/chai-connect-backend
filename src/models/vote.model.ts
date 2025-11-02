@@ -1,34 +1,22 @@
-import mongoose from "mongoose";
+import { z } from "zod";
 
-const voteSchema = new mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    targetType: {
-      type: String,
-      enum: ["post", "comment"],
-      required: true,
-    },
-    targetId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-      refPath: "targetModel",
-    },
-    voteType: {
-      type: String,
-      enum: ["upvote", "downvote"],
-      required: true,
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId format");
 
-// Ensure one vote per user per target
-voteSchema.index({ user: 1, targetId: 1 }, { unique: true });
+export const voteSchema = z.object({
+  user: objectId.describe("User ObjectId"),
 
-export const Vote = mongoose.model("Vote", voteSchema);
+  targetType: z.enum(["post", "comment"], {
+    error: "Target type is required",
+  }),
+
+  targetId: objectId.describe("Target document ObjectId"),
+
+  voteType: z.enum(["upvote", "downvote"], {
+    error: "Vote type is required",
+  }),
+
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
+});
+
+export type VoteInput = z.infer<typeof voteSchema>;
