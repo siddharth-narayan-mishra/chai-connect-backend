@@ -2,11 +2,6 @@ import mongoose from "mongoose";
 
 const creditTransactionSchema = new mongoose.Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-    },
     from: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

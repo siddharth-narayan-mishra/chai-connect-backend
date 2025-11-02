@@ -2,11 +2,6 @@ import mongoose from "mongoose";
 
 const exchangeRequestSchema = new mongoose.Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-    },
     listing: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SkillListing",
@@ -21,47 +16,32 @@ const exchangeRequestSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    listingCreator: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
     message: {
       type: String,
       required: true,
       minlength: 10,
       maxlength: 1000,
     },
-    proposedExchangeType: {
-      type: String,
-      enum: ["credits_only", "skill_only", "credits_and_skill"],
-      required: true,
-    },
     proposedCredits: {
+      // if 0 then only skill exchange
       type: Number,
       default: 0,
       min: 0,
     },
     proposedSkills: {
+      // if empty then only credits exchange
       type: [String],
       default: [],
     },
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected", "cancelled"],
+      enum: ["pending", "accepted", "cancelled"],
       default: "pending",
-    },
-    responseMessage: {
-      type: String,
-      maxlength: 1000,
-    },
-    respondedAt: {
-      type: Date,
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes
@@ -71,5 +51,5 @@ exchangeRequestSchema.index({ listingCreator: 1, status: 1 });
 
 export const ExchangeRequest = mongoose.model(
   "ExchangeRequest",
-  exchangeRequestSchema
+  exchangeRequestSchema,
 );

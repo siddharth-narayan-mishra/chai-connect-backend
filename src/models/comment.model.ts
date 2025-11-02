@@ -3,11 +3,6 @@ import mongoose from "mongoose";
 // Comment Schema
 const commentSchema = new mongoose.Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-    },
     content: {
       type: String,
       required: true,
@@ -38,28 +33,9 @@ const commentSchema = new mongoose.Schema(
       default: 0,
       max: 10, // Limit nesting depth
     },
-    upvotes: {
-      type: Number,
-      default: 0,
-    },
-    downvotes: {
-      type: Number,
-      default: 0,
-    },
     voteScore: {
       type: Number,
       default: 0,
-    },
-    isEdited: {
-      type: Boolean,
-      default: false,
-    },
-    editedAt: {
-      type: Date,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
     },
     replyCount: {
       type: Number,

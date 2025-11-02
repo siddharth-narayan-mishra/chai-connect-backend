@@ -2,11 +2,6 @@ import mongoose from "mongoose";
 
 const disputeSchema = new mongoose.Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-    },
     exchangeSession: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ExchangeSession",
@@ -24,13 +19,6 @@ const disputeSchema = new mongoose.Schema(
     },
     reason: {
       type: String,
-      enum: [
-        "no_show",
-        "incomplete_service",
-        "quality_issue",
-        "miscommunication",
-        "other",
-      ],
       required: true,
     },
     description: {

@@ -2,11 +2,6 @@ import mongoose from "mongoose";
 
 const exchangeSessionSchema = new mongoose.Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-    },
     listing: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SkillListing",
@@ -17,22 +12,17 @@ const exchangeSessionSchema = new mongoose.Schema(
       ref: "ExchangeRequest",
       required: true,
     },
-    participant1: {
+    requestor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-    participant2: {
+    responder: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
     exchangeDetails: {
-      type: {
-        type: String,
-        enum: ["credits_only", "skill_only", "credits_and_skill"],
-        required: true,
-      },
       creditsAmount: {
         type: Number,
         default: 0,
@@ -40,20 +30,7 @@ const exchangeSessionSchema = new mongoose.Schema(
       creditsPayer: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-      },
-      skillsExchanged: [
-        {
-          provider: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-          },
-          receiver: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-          },
-          skills: [String],
-        },
-      ],
+      }
     },
     status: {
       type: String,
@@ -69,21 +46,11 @@ const exchangeSessionSchema = new mongoose.Schema(
     completedDate: {
       type: Date,
     },
-    milestones: [
-      {
-        description: String,
-        completed: {
-          type: Boolean,
-          default: false,
-        },
-        completedAt: Date,
-      },
-    ],
-    participant1Confirmed: {
+    requestorConfirmed: {
       type: Boolean,
       default: false,
     },
-    participant2Confirmed: {
+    responderConfirmed: {
       type: Boolean,
       default: false,
     },
@@ -94,8 +61,8 @@ const exchangeSessionSchema = new mongoose.Schema(
 );
 
 // Indexes
-exchangeSessionSchema.index({ participant1: 1, status: 1 });
-exchangeSessionSchema.index({ participant2: 1, status: 1 });
+exchangeSessionSchema.index({ requestor: 1, status: 1 });
+exchangeSessionSchema.index({ responder: 1, status: 1 });
 exchangeSessionSchema.index({ status: 1 });
 
 export const ExchangeSession = mongoose.model(

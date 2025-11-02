@@ -1,23 +1,24 @@
 import mongoose from "mongoose";
 
+// each skill starts as a request
+// then others can respond to it with offers
+// offers can be accepted or rejected by the requestor
+// after acceptance a session is started
+// then review and finally a dispute can be raised if necessary
+
 // Skill Listing Schema
 const skillListingSchema = new mongoose.Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-    },
     title: {
       type: String,
       required: true,
-      minlength: 5,
+      minlength: 1,
       maxlength: 100,
     },
     description: {
       type: String,
       required: true,
-      minlength: 20,
+      minlength: 1,
       maxlength: 2000,
     },
     creator: {
@@ -29,16 +30,11 @@ const skillListingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    listingType: {
-      type: String,
-      enum: ["offer", "request"],
-      required: true,
-    },
     skills: {
       type: [String],
       required: true,
       validate: {
-        validator: function (v) {
+        validator: function (v: String[]) {
           return v && v.length > 0;
         },
         message: "At least one skill is required",
@@ -47,23 +43,6 @@ const skillListingSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: [
-        "programming",
-        "design",
-        "writing",
-        "marketing",
-        "business",
-        "languages",
-        "music",
-        "art",
-        "fitness",
-        "cooking",
-        "photography",
-        "videography",
-        "teaching",
-        "consulting",
-        "other",
-      ],
     },
     exchangeType: {
       type: String,
@@ -105,7 +84,7 @@ const skillListingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["active", "in_progress", "completed", "cancelled", "closed"],
+      enum: ["active", "in_progress", "completed", "cancelled"],
       default: "active",
     },
     viewCount: {
@@ -119,7 +98,7 @@ const skillListingSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes

@@ -2,11 +2,6 @@ import mongoose from "mongoose";
 
 const reviewSchema = new mongoose.Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-    },
     exchangeSession: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ExchangeSession",
