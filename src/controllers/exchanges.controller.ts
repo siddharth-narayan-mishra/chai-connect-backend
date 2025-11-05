@@ -17,7 +17,7 @@ import {
 } from "../schemas/index.ts";
 import { ZodError } from "zod";
 import mongoose from "mongoose";
-import type { AuthRequest } from "../middleware/auth.js";
+import type { AuthRequest } from "../middleware/auth.ts";
 
 // ==================== Exchange Requests ====================
 

@@ -9,7 +9,7 @@ export const createUser = async (req: Request, res: Response) => {
   const data = parsed.data;
 
   try {
-    const existing = await User.findOne({ username: data.username });
+    const existing = await User.findOne({ username: data.username }).exec();
     if (existing)
       return res.status(400).json({ message: "User already exists" });
 
@@ -39,7 +39,7 @@ export const getUser = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Username is required" });
     }
 
-    const user = await User.findOne({ username }).select("-__v -password");
+    const user = await User.findOne({ username }).exec();
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });

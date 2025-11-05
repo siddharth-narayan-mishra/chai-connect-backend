@@ -17,16 +17,6 @@ export const postSchema = z.object({
 
   mediaUrl: z.url("Invalid media URL").optional(),
 
-  author: objectId
-    .describe("User ObjectId")
-    .refine(Boolean, { message: "Author ID is required" }),
-
-  authorUsername: z
-    .string({
-      error: "Author username is required",
-    })
-    .min(1, "Author username cannot be empty"),
-
   voteScore: z.number().default(0),
 
   commentCount: z.number().default(0),

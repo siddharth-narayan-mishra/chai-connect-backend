@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+dotenv.config();
 
 // Extend Express Request type to include user
 export interface AuthRequest extends Request {
@@ -49,6 +51,7 @@ export const auth = async (
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
+      console.error("JWT verification error:", error);
       res.status(401).json({ message: "Invalid token" });
       return;
     }

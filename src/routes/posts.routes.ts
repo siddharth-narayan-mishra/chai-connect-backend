@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express, { Router } from "express";
 import {
   createPost,
@@ -8,25 +11,23 @@ import {
   votePost,
   getPostComments,
   createComment,
-  getPostVoteStatus,
 } from "../controllers/posts.controller.ts";
 import { auth } from "../middleware/auth.ts";
 
-const router: Router = express.Router();
+const postsRouter: Router = express.Router();
 
 // Post CRUD operations
-router.post("/", auth, createPost);
-router.get("/", getPosts);
-router.get("/:id", getPostById);
-router.put("/:id", auth, updatePost);
-router.delete("/:id", auth, deletePost);
+postsRouter.post("/", auth, createPost);
+postsRouter.get("/", getPosts);
+postsRouter.get("/:id", getPostById);
+postsRouter.put("/:id", auth, updatePost);
+postsRouter.delete("/:id", auth, deletePost);
 
 // Voting
-router.post("/:id/vote", auth, votePost);
-router.get("/:id/vote-status", auth, getPostVoteStatus);
+postsRouter.post("/:id/vote", auth, votePost);
 
 // Comments
-router.get("/:id/comments", getPostComments);
-router.post("/:id/comments", auth, createComment);
+postsRouter.get("/:id/comments", getPostComments);
+postsRouter.post("/:id/comments", auth, createComment);
 
-export default router;
+export default postsRouter;

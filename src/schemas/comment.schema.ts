@@ -7,14 +7,6 @@ export const commentSchema = z.object({
     .min(1, "Content cannot be empty")
     .max(10000, "Content too long (max 10,000 characters)"),
   
-  author: z
-    .string()
-    .regex(/^[a-f\d]{24}$/i, "Invalid author ObjectId"), // MongoDB ObjectId
-  
-  authorUsername: z
-    .string()
-    .min(1, "Username required"),
-  
   post: z
     .string()
     .regex(/^[a-f\d]{24}$/i, "Invalid post ObjectId"),
@@ -41,9 +33,6 @@ export const commentSchema = z.object({
     .number()
     .int()
     .default(0),
-
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
 });
 
 // ✅ Type inference (for TS)

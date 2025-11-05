@@ -3,7 +3,7 @@ import { Post, Comment, Vote, User } from "../models/index.ts";
 import { postSchema, commentSchema, voteSchema } from "../schemas/index.ts";
 import { ZodError } from "zod";
 import mongoose from "mongoose";
-import type { AuthRequest } from "../middleware/auth.js";
+import type { AuthRequest } from "../middleware/auth.ts";
 
 // Query params interfaces
 interface GetPostsQuery {
@@ -22,12 +22,15 @@ interface GetCommentsQuery {
 }
 
 // Create a new post
-export const createPost = async (req: Request, res: Response): Promise<void> => {
+export const createPost = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
     const validatedData = postSchema.parse(authReq.body);
-    
-    const user = await User.findById(authReq.user.userId);
+
+    const user = await User.findById(authReq.user.userId).exec();
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
@@ -40,7 +43,7 @@ export const createPost = async (req: Request, res: Response): Promise<void> => 
     });
 
     await post.save();
-    
+
     res.status(201).json({
       message: "Post created successfully",
       post,
@@ -53,7 +56,7 @@ export const createPost = async (req: Request, res: Response): Promise<void> => 
       });
       return;
     }
-    
+
     res.status(500).json({
       message: "Error creating post",
       error: error instanceof Error ? error.message : "Unknown error",
@@ -64,7 +67,7 @@ export const createPost = async (req: Request, res: Response): Promise<void> => 
 // Get all posts with pagination and filtering
 export const getPosts = async (
   req: Request<{}, {}, {}, GetPostsQuery>,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const {
@@ -77,11 +80,11 @@ export const getPosts = async (
     } = req.query;
 
     const query: Record<string, any> = {};
-    
+
     if (author) {
       query.author = author;
     }
-    
+
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: "i" } },
@@ -95,10 +98,9 @@ export const getPosts = async (
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
 
-    const posts = await Post.find(query)
-      .sort(sortOptions)
-    
-    const count = await Post.countDocuments(query);
+    const posts = await Post.find(query).sort(sortOptions);
+
+    const count = await Post.countDocuments(query).exec();
 
     res.status(200).json({
       posts,
@@ -117,13 +119,20 @@ export const getPosts = async (
 // Get a single post by ID
 export const getPostById = async (
   req: Request<{ id: string }>,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ message: "Invalid post ID" });
       return;
     }
+
+    const post = await Post.findById(id)
+      .populate("author", "username avatar")
+      .lean()
+      .exec();
 
     if (!post) {
       res.status(404).json({ message: "Post not found" });
@@ -141,20 +150,21 @@ export const getPostById = async (
 
 // Update a post
 export const updatePost = async (
-  req: Request<{ id: string }>,
-  res: Response
+  req: Request,
+  res: Response,
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
-    
-    if (!mongoose.Types.ObjectId.isValid(authReq.params.id)) {
+    const { id } = req.params;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ message: "Invalid post ID" });
       return;
     }
 
     const validatedData = postSchema.partial().parse(authReq.body);
-    
-    const post = await Post.findById(authReq.params.id);
+
+    const post = await Post.findById(authReq.params.id).exec();
 
     if (!post) {
       res.status(404).json({ message: "Post not found" });
@@ -170,7 +180,11 @@ export const updatePost = async (
     }
 
     // Update allowed fields
-    const allowedUpdates: Array<keyof typeof validatedData> = ["title", "content", "mediaUrl"];
+    const allowedUpdates: Array<keyof typeof validatedData> = [
+      "title",
+      "content",
+      "mediaUrl",
+    ];
     allowedUpdates.forEach((field) => {
       if (validatedData[field] !== undefined) {
         (post as any)[field] = validatedData[field];
@@ -191,7 +205,7 @@ export const updatePost = async (
       });
       return;
     }
-    
+
     res.status(500).json({
       message: "Error updating post",
       error: error instanceof Error ? error.message : "Unknown error",
@@ -201,18 +215,19 @@ export const updatePost = async (
 
 // Delete a post
 export const deletePost = async (
-  req: Request<{ id: string }>,
-  res: Response
+  req: Request,
+  res: Response,
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
-    
-    if (!mongoose.Types.ObjectId.isValid(authReq.params.id)) {
+    const { id } = authReq.params;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ message: "Invalid post ID" });
       return;
     }
 
-    const post = await Post.findById(authReq.params.id);
+    const post = await Post.findById(authReq.params.id).exec();
 
     if (!post) {
       res.status(404).json({ message: "Post not found" });
@@ -228,10 +243,13 @@ export const deletePost = async (
     }
 
     // Delete associated comments and votes
-    await Comment.deleteMany({ post: authReq.params.id });
-    await Vote.deleteMany({ targetType: "post", targetId: authReq.params.id });
+    await Comment.deleteMany({ post: authReq.params.id }).exec();
+    await Vote.deleteMany({
+      targetType: "post",
+      targetId: authReq.params.id,
+    }).exec();
 
-    await Post.findByIdAndDelete(authReq.params.id);
+    await Post.findByIdAndDelete(authReq.params.id).exec();
 
     res.status(200).json({ message: "Post deleted successfully" });
   } catch (error) {
@@ -243,23 +261,22 @@ export const deletePost = async (
 };
 
 // Vote on a post
-export const votePost = async (
-  req: Request<{ id: string }>,
-  res: Response
-): Promise<void> => {
+export const votePost = async (req: Request, res: Response): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
-    
-    if (!mongoose.Types.ObjectId.isValid(authReq.params.id)) {
+    const { id } = req.params;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ message: "Invalid post ID" });
       return;
     }
-
+    
+    console.log("Request Body : ", authReq.body);
     const { voteType } = voteSchema.parse(authReq.body);
     const postId = authReq.params.id;
     const userId = authReq.user.userId;
 
-    const post = await Post.findById(postId);
+    const post = await Post.findById(postId).exec();
     if (!post) {
       res.status(404).json({ message: "Post not found" });
       return;
@@ -270,14 +287,14 @@ export const votePost = async (
       user: userId,
       targetId: postId,
       targetType: "post",
-    });
+    }).exec();
 
     let voteChange = 0;
 
     if (existingVote) {
       if (existingVote.voteType === voteType) {
         // Remove vote if clicking same button
-        await Vote.deleteOne({ _id: existingVote._id });
+        await Vote.deleteOne({ _id: existingVote._id }).exec();
         voteChange = voteType === "upvote" ? -1 : 1;
       } else {
         // Change vote
@@ -312,39 +329,9 @@ export const votePost = async (
       });
       return;
     }
-    
+
     res.status(500).json({
       message: "Error voting on post",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-};
-
-// Get user's vote status for a post
-export const getPostVoteStatus = async (
-  req: Request<{ id: string }>,
-  res: Response
-): Promise<void> => {
-  try {
-    const authReq = req as AuthRequest;
-    
-    if (!mongoose.Types.ObjectId.isValid(authReq.params.id)) {
-      res.status(400).json({ message: "Invalid post ID" });
-      return;
-    }
-
-    const vote = await Vote.findOne({
-      user: authReq.user.userId,
-      targetId: authReq.params.id,
-      targetType: "post",
-    }).lean();
-
-    res.status(200).json({
-      voteType: vote ? vote.voteType : null,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Error fetching vote status",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
@@ -353,7 +340,7 @@ export const getPostVoteStatus = async (
 // Get comments for a post
 export const getPostComments = async (
   req: Request<{ id: string }, {}, {}, GetCommentsQuery>,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { sort = "createdAt", order = "desc", limit = "50" } = req.query;
@@ -364,22 +351,20 @@ export const getPostComments = async (
       return;
     }
 
-    const post = await Post.findById(postId);
+    const post = await Post.findById(postId).exec();
     if (!post) {
       res.status(404).json({ message: "Post not found" });
       return;
     }
 
     const sortOrder = order === "asc" ? 1 : -1;
-    const sortOptions: Record<string, 1 | -1> = { [sort]: sortOrder };
-    const limitNum = parseInt(limit);
 
     // Get top-level comments only (depth 0)
     const comments = await Comment.find({
       post: postId,
       depth: 0,
-    })
-    
+    }).exec();
+
     res.status(200).json({ comments });
   } catch (error) {
     res.status(500).json({
@@ -391,41 +376,66 @@ export const getPostComments = async (
 
 // Create a comment on a post
 export const createComment = async (
-  req: Request<{ id: string }>,
-  res: Response
+  req: Request,
+  res: Response,
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
-    const validatedData = commentSchema.parse(authReq.body);
     const postId = authReq.params.id;
+    const { content, parentComment } = authReq.body;
 
-    if (!mongoose.Types.ObjectId.isValid(postId)) {
+    if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
       res.status(400).json({ message: "Invalid post ID" });
       return;
     }
 
-    const post = await Post.findById(postId);
-    if (!post) {
-      res.status(404).json({ message: "Post not found" });
-      return;
-    }
-
-    const user = await User.findById(authReq.user.userId);
+    const user = await User.findById(authReq.user.userId).exec();
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
     }
 
+    const post = await Post.findById(postId).exec();
+    if (!post) {
+      res.status(404).json({ message: "Post not found" });
+      return;
+    }
+
+    if (!content || typeof content !== "string" || content.trim().length === 0) {
+      res.status(400).json({ message: "Comment content is required" });
+      return;
+    }
+
+    if (content.length > 10000) {
+      res.status(400).json({ message: "Comment exceeds max length (10000 chars)" });
+      return;
+    }
+
+    let depth = 0;
+    if (parentComment) {
+      const parent = await Comment.findById(parentComment).exec();
+      if (!parent) {
+        res.status(404).json({ message: "Parent comment not found" });
+        return;
+      }
+      if (parent.depth >= 10) {
+        res.status(400).json({ message: "Maximum nesting depth reached" });
+        return;
+      }
+      depth = parent.depth + 1;
+    }
+
     const comment = new Comment({
-      ...validatedData,
+      content: content.trim(),
       author: authReq.user.userId,
       authorUsername: user.username,
       post: postId,
+      parentComment: parentComment || null,
+      depth,
     });
 
     await comment.save();
 
-    // Update post comment count
     post.commentCount += 1;
     await post.save();
 
@@ -434,14 +444,6 @@ export const createComment = async (
       comment,
     });
   } catch (error) {
-    if (error instanceof ZodError) {
-      res.status(400).json({
-        message: "Validation error",
-        error: error.message,
-      });
-      return;
-    }
-    
     res.status(500).json({
       message: "Error creating comment",
       error: error instanceof Error ? error.message : "Unknown error",
