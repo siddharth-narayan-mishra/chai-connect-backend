@@ -1,7 +1,7 @@
 import express from "express";
 import type { Request, Response } from "express";
 import { connectToDatabase } from "./db/index.ts";
-import { userRouter, eventsRouter } from "./routes/index.ts";
+import { userRouter, eventsRouter, exchangesRouter, postsRouter } from "./routes/index.ts";
 
 connectToDatabase();
 
@@ -16,6 +16,8 @@ app.get("/", (req: Request, res: Response) => {
 
 app.use("/user", userRouter);
 app.use("/event", eventsRouter);
+app.use("/exchange", exchangesRouter);
+app.use("/post", postsRouter);
 
 app.listen(PORT, () =>
   console.log(`Server running at http://localhost:${PORT}`),

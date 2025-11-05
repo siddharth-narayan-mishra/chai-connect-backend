@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { Model, type InferSchemaType } from "mongoose";
 
 // each skill starts as a request
 // then others can respond to it with offers
@@ -107,4 +107,7 @@ skillListingSchema.index({ creator: 1 });
 skillListingSchema.index({ category: 1, status: 1 });
 skillListingSchema.index({ skills: 1 });
 
-export const SkillListing = mongoose.model("SkillListing", skillListingSchema);
+export type SkillListingType = InferSchemaType<typeof skillListingSchema>;
+
+export const SkillListing: Model<SkillListingType> =
+  mongoose.model<SkillListingType>("SkillListing", skillListingSchema);
