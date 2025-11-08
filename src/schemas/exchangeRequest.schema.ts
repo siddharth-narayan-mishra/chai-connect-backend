@@ -1,44 +1,74 @@
 import { z } from "zod";
 
-const objectId = z
-  .string()
-  .regex(/^[a-f\d]{24}$/i, "Invalid ObjectId format");
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId format");
 
 export const exchangeRequestSchema = z.object({
-  listing: objectId.describe("SkillListing ObjectId").refine(Boolean, {
-    message: "Listing ID is required",
-  }),
-
-  requester: objectId.describe("User ObjectId").refine(Boolean, {
-    message: "Requester ID is required",
-  }),
-
-  requesterUsername: z
+  title: z
     .string({
-      error: "Requester username is required",
+      error: "Title is required",
     })
-    .min(1, "Requester username cannot be empty"),
+    .min(1, "Title cannot be empty")
+    .max(100, "Title cannot exceed 100 characters"),
 
-  message: z
+  description: z
     .string({
-      error: "Message is required",
+      error: "Description is required",
     })
-    .min(10, "Message must be at least 10 characters long")
-    .max(1000, "Message cannot exceed 1000 characters"),
+    .min(1, "Description cannot be empty")
+    .max(2000, "Description cannot exceed 2000 characters"),
 
-  proposedCredits: z
+  creator: objectId.describe("User ObjectId"),
+
+  creatorUsername: z
+    .string({
+      error: "Creator username is required",
+    })
+    .min(1, "Creator username cannot be empty"),
+
+  creditsRequested: z
     .number()
-    .min(0, "Proposed credits cannot be negative")
+    .min(0, "Credit amount cannot be negative")
     .default(0),
 
-  proposedSkills: z.array(z.string().trim()).default([]),
+  creditsOffered: z
+    .number()
+    .min(0, "Credit amount cannot be negative")
+    .default(0),
+
+  skillsRequested: z.array(z.string().min(1)).default([]),
+  skillsOffered: z.array(z.string().min(1)).default([]),
+
+  duration: z.object({
+    value: z
+      .number({
+        error: "Duration value is required",
+      })
+      .positive("Duration must be a positive number"),
+
+    unit: z.enum(["hours", "days", "weeks", "sessions"]),
+  }),
+
+  availabilitySchedule: z
+    .string()
+    .max(500, "Availability schedule cannot exceed 500 characters")
+    .optional(),
+
+  location: z.object({
+    type: z.enum(["online", "in_person", "hybrid"]),
+    city: z.string().optional(),
+    country: z.string().optional(),
+  }),
 
   status: z
-    .enum(["pending", "accepted", "cancelled"])
-    .default("pending"),
+    .enum(["active", "in_progress", "completed", "cancelled"])
+    .default("active"),
+
+  viewCount: z.number().int().min(0).default(0),
+
+  responseCount: z.number().int().min(0).default(0),
 
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
 });
 
-export type ExchangeRequestInput = z.infer<typeof exchangeRequestSchema>;
+export type ExchangeRequestSchemaType = z.infer<typeof exchangeRequestSchema>;

@@ -5,7 +5,6 @@ import {
   ExchangeSession,
   Review,
   Dispute,
-  SkillListing,
   User,
   CreditTransaction,
 } from "../models/index.ts";
@@ -24,134 +23,106 @@ import type { AuthRequest } from "../middleware/auth.ts";
 // Create a new exchange request
 export const createExchangeRequest = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
-    const validatedData = exchangeRequestSchema.parse(authReq.body);
+    const userId = authReq.user.userId;
 
-    // Check if listing exists and is active
-    const listing = await SkillListing.findById(validatedData.listing).exec();
-    if (!listing) {
-      res.status(404).json({ message: "Skill listing not found" });
-      return;
-    }
-
-    if (listing.status !== "active") {
-      res.status(400).json({ message: "This listing is no longer active" });
-      return;
-    }
-
-    // Check if user is not the listing creator
-    if (listing.creator.toString() === authReq.user.userId) {
-      res.status(400).json({ message: "You cannot request your own listing" });
-      return;
-    }
-
-    const user = await User.findById(authReq.user.userId).exec();
-    if (!user) {
-      res.status(404).json({ message: "User not found" });
-      return;
-    }
-
-    const exchangeRequest = new ExchangeRequest({
-      ...validatedData,
-      requester: authReq.user.userId,
-      requesterUsername: user.username,
+    // Validate request body (excluding server-side fields)
+    const validationSchema = exchangeRequestSchema.omit({
+      creator: true,
+      creatorUsername: true,
+      viewCount: true,
+      responseCount: true,
+      createdAt: true,
+      updatedAt: true,
+      status: true,
     });
 
-    await exchangeRequest.save();
+    const validatedData = validationSchema.parse(authReq.body);
 
-    // Increment response count on listing
-    listing.responseCount += 1;
-    await listing.save();
+    // Get user details from database
+    const user = await User.findById(userId).exec();
+
+    if (!user) {
+      res.status(404).json({
+        message: "User not found",
+      });
+      return;
+    }
+
+    // Create exchange request
+    const newRequest = await ExchangeRequest.create({
+      ...validatedData,
+      creator: userId,
+      creatorUsername: user.username,
+      viewCount: 0,
+      responseCount: 0,
+    });
 
     res.status(201).json({
       message: "Exchange request created successfully",
-      exchangeRequest,
+      exchangeRequest: newRequest,
     });
   } catch (error) {
     if (error instanceof ZodError) {
-      res
-        .status(400)
-        .json({ message: "Validation error", error: error.message });
+      res.status(400).json({
+        message: "Validation error",
+        errors: error.message,
+      });
       return;
     }
+
+    console.error("Error creating exchange request:", error);
     res.status(500).json({
-      message: "Error creating exchange request",
+      message: "Failed to create exchange request",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
 
-// Get all exchange requests with filters
+// Get all exchange requests with optional filters
 export const getExchangeRequests = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
-    const { listing, requester, status, page = "1", limit = "20" } = req.query;
-
-    const query: Record<string, any> = {};
-
-    if (listing) query.listing = listing;
-    if (requester) query.requester = requester;
-    if (status) query.status = status;
-
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-
-    const requests = await ExchangeRequest.find(query)
-      .populate("listing", "title skills category")
-      .populate("requester", "username avatar")
-      .sort({ createdAt: -1 })
-      .limit(limitNum)
-      .skip((pageNum - 1) * limitNum)
-      .lean()
-      .exec();
-
-    const count = await ExchangeRequest.countDocuments(query).exec();
-
-    res.status(200).json({
-      requests,
-      totalPages: Math.ceil(count / limitNum),
-      currentPage: pageNum,
-      totalRequests: count,
-    });
+    const exchangeRequests = await ExchangeRequest.find().exec();
+    res.status(200).json(exchangeRequests);
   } catch (error) {
-    res.status(500).json({
-      message: "Error fetching exchange requests",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-// Get a specific exchange request
+// Get a single exchange request by ID
 export const getExchangeRequestById = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
-    if (!req.params.id || !mongoose.Types.ObjectId.isValid(req.params.id)) {
-      res.status(400).json({ message: "Invalid request ID" });
-      return;
-    }
+    const authReq = req as AuthRequest;
+    const { id } = authReq.params;
 
-    const exchangeRequest = await ExchangeRequest.findById(req.params.id)
-      .populate("listing")
-      .populate("requester", "username avatar bio skills")
-      .lean()
-      .exec();
+    const request = await ExchangeRequest.findById(id).lean().exec();
 
-    if (!exchangeRequest) {
+    if (!request) {
       res.status(404).json({ message: "Exchange request not found" });
       return;
     }
 
-    res.status(200).json({ exchangeRequest });
+    // Increment view count (don't await to avoid blocking response)
+    ExchangeRequest.findByIdAndUpdate(
+      id,
+      { $inc: { viewCount: 1 } },
+      { new: false }
+    ).catch((err) => console.error("Error incrementing view count:", err));
+
+    res.status(200).json({ exchangeRequest: request });
   } catch (error) {
+    console.error("Error fetching exchange request:", error);
     res.status(500).json({
-      message: "Error fetching exchange request",
+      message: "Failed to fetch exchange request",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
@@ -160,65 +131,66 @@ export const getExchangeRequestById = async (
 // Update an exchange request
 export const updateExchangeRequest = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
+    const { id } = authReq.params;
+    const userId = authReq.user.userId;
 
-    if (
-      !authReq.params.id ||
-      !mongoose.Types.ObjectId.isValid(authReq.params.id)
-    ) {
-      res.status(400).json({ message: "Invalid request ID" });
-      return;
-    }
+    // Check if request exists
+    const existingRequest = await ExchangeRequest.findById(id).exec();
 
-    const exchangeRequest = await ExchangeRequest.findById(authReq.params.id).exec();
-
-    if (!exchangeRequest) {
+    if (!existingRequest) {
       res.status(404).json({ message: "Exchange request not found" });
       return;
     }
 
-    // Check if user is the requester
-    if (exchangeRequest.requester.toString() !== authReq.user.userId) {
-      res
-        .status(403)
-        .json({ message: "You don't have permission to update this request" });
+    // Check authorization
+    if (existingRequest.creator.toString() !== userId) {
+      res.status(403).json({
+        message: "You are not authorized to update this exchange request",
+      });
       return;
     }
 
-    // Can only update pending requests
-    if (exchangeRequest.status !== "pending") {
-      res.status(400).json({ message: "Can only update pending requests" });
-      return;
-    }
+    // Validate update data (partial schema)
+    const updateSchema = exchangeRequestSchema
+      .omit({
+        creator: true,
+        creatorUsername: true,
+        viewCount: true,
+        responseCount: true,
+        createdAt: true,
+        updatedAt: true,
+      })
+      .partial();
 
-    const validatedData = exchangeRequestSchema.partial().parse(authReq.body);
+    const validatedData = updateSchema.parse(req.body);
 
-    // Update allowed fields
-    const allowedUpdates = ["message", "proposedCredits", "proposedSkills"];
-    allowedUpdates.forEach((field) => {
-      if ((validatedData as any)[field] !== undefined) {
-        (exchangeRequest as any)[field] = (validatedData as any)[field];
-      }
-    });
-
-    await exchangeRequest.save();
+    // Update the request
+    const updatedRequest = await ExchangeRequest.findByIdAndUpdate(
+      id,
+      { $set: validatedData },
+      { new: true, runValidators: true }
+    );
 
     res.status(200).json({
       message: "Exchange request updated successfully",
-      exchangeRequest,
+      exchangeRequest: updatedRequest,
     });
   } catch (error) {
     if (error instanceof ZodError) {
-      res
-        .status(400)
-        .json({ message: "Validation error", error: error.message });
+      res.status(400).json({
+        message: "Validation error",
+        errors: error.message,
+      });
       return;
     }
+
+    console.error("Error updating exchange request:", error);
     res.status(500).json({
-      message: "Error updating exchange request",
+      message: "Failed to update exchange request",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
@@ -227,47 +199,59 @@ export const updateExchangeRequest = async (
 // Cancel an exchange request
 export const cancelExchangeRequest = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
+    const { id } = authReq.params;
+    const userId = authReq.user.userId;
 
-    if (
-      !authReq.params.id ||
-      !mongoose.Types.ObjectId.isValid(authReq.params.id)
-    ) {
-      res.status(400).json({ message: "Invalid request ID" });
-      return;
-    }
+    // Check if request exists
+    const existingRequest = await ExchangeRequest.findById(id).exec();
 
-    const exchangeRequest = await ExchangeRequest.findById(authReq.params.id).exec();
-
-    if (!exchangeRequest) {
+    if (!existingRequest) {
       res.status(404).json({ message: "Exchange request not found" });
       return;
     }
 
-    if (exchangeRequest.requester.toString() !== authReq.user.userId) {
-      res
-        .status(403)
-        .json({ message: "You don't have permission to cancel this request" });
+    // Check authorization
+    if (existingRequest.creator.toString() !== userId) {
+      res.status(403).json({
+        message: "You are not authorized to cancel this exchange request",
+      });
       return;
     }
 
-    if (exchangeRequest.status !== "pending") {
-      res.status(400).json({ message: "Can only cancel pending requests" });
+    // Check if already cancelled or completed
+    if (existingRequest.status === "cancelled") {
+      res.status(400).json({
+        message: "Exchange request is already cancelled",
+      });
       return;
     }
 
-    exchangeRequest.status = "cancelled";
-    await exchangeRequest.save();
+    if (existingRequest.status === "completed") {
+      res.status(400).json({
+        message: "Cannot cancel a completed exchange request",
+      });
+      return;
+    }
 
-    res
-      .status(200)
-      .json({ message: "Exchange request cancelled successfully" });
+    // Soft delete by updating status to cancelled
+    const updatedRequest = await ExchangeRequest.findByIdAndUpdate(
+      id,
+      { $set: { status: "cancelled" } },
+      { new: true }
+    );
+
+    res.status(200).json({
+      message: "Exchange request cancelled successfully",
+      exchangeRequest: updatedRequest,
+    });
   } catch (error) {
+    console.error("Error cancelling exchange request:", error);
     res.status(500).json({
-      message: "Error cancelling exchange request",
+      message: "Failed to cancel exchange request",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
@@ -278,7 +262,7 @@ export const cancelExchangeRequest = async (
 // Create a response to an exchange request
 export const createExchangeResponse = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -289,39 +273,23 @@ export const createExchangeResponse = async (
       return;
     }
 
-    const exchangeRequest = await ExchangeRequest.findById(requestId)
-      .populate("listing")
-      .exec();
+    const exchangeRequest = await ExchangeRequest.findById(requestId).exec();
 
     if (!exchangeRequest) {
       res.status(404).json({ message: "Exchange request not found" });
       return;
     }
 
-    if (exchangeRequest.status !== "pending") {
-      res.status(400).json({ message: "This request is no longer pending" });
+    if (exchangeRequest.status !== "active") {
+      res.status(400).json({ message: "This request is no longer active" });
       return;
     }
 
     // Check if user is the listing creator
-    const listing = exchangeRequest.listing as any;
-    if (listing.creator.toString() !== authReq.user.userId) {
-      res
-        .status(403)
-        .json({
-          message: "Only the listing creator can respond to this request",
-        });
-      return;
-    }
-
-    // Check if response already exists
-    const existingResponse = await ExchangeResponse.findOne({
-      exchangeRequest: requestId,
-    }).exec();
-    if (existingResponse) {
-      res
-        .status(400)
-        .json({ message: "You have already responded to this request" });
+    if (exchangeRequest.creator.toString() === authReq.user.userId) {
+      res.status(403).json({
+        message: "The requestor cannot respond to this request",
+      });
       return;
     }
 
@@ -340,6 +308,7 @@ export const createExchangeResponse = async (
       ...validatedData,
       responder: authReq.user.userId,
       responderUsername: user.username,
+      exchangeRequest: requestId,
     });
 
     await exchangeResponse.save();
@@ -365,7 +334,7 @@ export const createExchangeResponse = async (
 // Get responses for a request
 export const getExchangeResponses = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const requestId = req.params.requestId;
@@ -378,8 +347,6 @@ export const getExchangeResponses = async (
     const responses = await ExchangeResponse.find({
       exchangeRequest: requestId,
     })
-      .populate("responder", "username avatar")
-      .sort({ createdAt: -1 })
       .lean()
       .exec();
 
@@ -395,7 +362,7 @@ export const getExchangeResponses = async (
 // Accept a response (creates exchange session)
 export const acceptExchangeResponse = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -407,8 +374,7 @@ export const acceptExchangeResponse = async (
     }
 
     const exchangeResponse = await ExchangeResponse.findById(responseId)
-      .populate("exchangeRequest")
-      .exec();
+    .exec();
 
     if (!exchangeResponse) {
       res.status(404).json({ message: "Response not found" });
@@ -434,7 +400,6 @@ export const acceptExchangeResponse = async (
 
     // Create exchange session
     const session = new ExchangeSession({
-      listing: exchangeRequest.listing,
       exchangeRequest: exchangeRequest._id,
       requestor: exchangeRequest.requester,
       responder: exchangeResponse.responder,
@@ -469,7 +434,7 @@ export const acceptExchangeResponse = async (
 // Reject a response
 export const rejectExchangeResponse = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -515,7 +480,7 @@ export const rejectExchangeResponse = async (
 // Get all sessions for authenticated user
 export const getExchangeSessions = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -562,7 +527,7 @@ export const getExchangeSessions = async (
 // Get a specific session
 export const getExchangeSessionById = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -611,7 +576,7 @@ export const getExchangeSessionById = async (
 // Update session
 export const updateExchangeSession = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -665,7 +630,7 @@ export const updateExchangeSession = async (
 // Confirm exchange completion
 export const confirmExchangeCompletion = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -744,7 +709,7 @@ export const confirmExchangeCompletion = async (
 // Cancel session
 export const cancelExchangeSession = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -796,7 +761,7 @@ export const cancelExchangeSession = async (
 // Create a review
 export const createReview = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -876,7 +841,7 @@ export const createReview = async (
 // Get reviews
 export const getReviews = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const { reviewee, session, page = "1", limit = "20" } = req.query;
@@ -917,7 +882,7 @@ export const getReviews = async (
 // Get a specific review
 export const getReviewById = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     if (!req.params.id || !mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -951,7 +916,7 @@ export const getReviewById = async (
 // Create a dispute
 export const createDispute = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -1030,7 +995,7 @@ export const createDispute = async (
 // Get disputes
 export const getDisputes = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -1077,7 +1042,7 @@ export const getDisputes = async (
 // Get a specific dispute
 export const getDisputeById = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -1125,7 +1090,7 @@ export const getDisputeById = async (
 // Respond to a dispute
 export const respondToDispute = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -1190,7 +1155,7 @@ export const respondToDispute = async (
 // Resolve a dispute (admin function)
 export const resolveDispute = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const authReq = req as AuthRequest;
@@ -1216,11 +1181,9 @@ export const resolveDispute = async (
     const { resolution, status } = authReq.body;
 
     if (!resolution || resolution.length > 1000) {
-      res
-        .status(400)
-        .json({
-          message: "Resolution must be provided and under 1000 characters",
-        });
+      res.status(400).json({
+        message: "Resolution must be provided and under 1000 characters",
+      });
       return;
     }
 
@@ -1246,4 +1209,4 @@ export const resolveDispute = async (
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
-}
+};

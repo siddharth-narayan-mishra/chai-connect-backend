@@ -9,7 +9,6 @@ import { ExchangeSession } from "./exchangeSession.model.ts";
 import { Post } from "./post.model.ts";
 import { Report } from "./report.model.ts";
 import { Review } from "./review.model.ts";
-import { SkillListing } from "./skillListing.model.ts";
 import { Vote } from "./vote.model.ts";
 
 export {
@@ -24,6 +23,5 @@ export {
   Post,
   Report,
   Review,
-  SkillListing,
   Vote,
 };

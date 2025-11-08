@@ -8,7 +8,6 @@ import { exchangeSessionSchema } from "./exchangeSession.schema.ts";
 import { postSchema } from "./post.schema.ts";
 import { reportSchema } from "./report.schema.ts";
 import { reviewSchema} from "./review.schema.ts";
-import { skillListingSchema } from "./skillListing.schema.ts";
 import { createUserSchema } from "./user.schema.ts";
 import { voteSchema } from "./vote.schema.ts";
 
@@ -23,7 +22,6 @@ export {
     postSchema,
     reportSchema,
     reviewSchema,
-    skillListingSchema,
     createUserSchema,
     voteSchema,
 };

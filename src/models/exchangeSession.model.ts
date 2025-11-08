@@ -2,11 +2,6 @@ import mongoose from "mongoose";
 
 const exchangeSessionSchema = new mongoose.Schema(
   {
-    listing: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "SkillListing",
-      required: true,
-    },
     exchangeRequest: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ExchangeRequest",

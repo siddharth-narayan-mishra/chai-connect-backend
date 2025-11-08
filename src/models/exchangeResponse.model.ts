@@ -18,19 +18,19 @@ const exchangeResponseSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["accepted", "rejected"],
+      enum: ["accepted", "rejected", "pending"],
       required: true,
     },
     message: {
       type: String,
       required: true,
-      minlength: 10,
+      minlength: 1,
       maxlength: 1000,
     },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 // Indexes
@@ -43,5 +43,5 @@ exchangeResponseSchema.index({ exchangeRequest: 1 }, { unique: true });
 
 export const ExchangeResponse = mongoose.model(
   "ExchangeResponse",
-  exchangeResponseSchema,
+  exchangeResponseSchema
 );

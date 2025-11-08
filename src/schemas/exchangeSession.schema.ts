@@ -3,9 +3,6 @@ import { z } from "zod";
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId format");
 
 export const exchangeSessionSchema = z.object({
-  listing: objectId
-    .describe("SkillListing ObjectId")
-    .refine(Boolean, { message: "Listing ID is required" }),
 
   exchangeRequest: objectId
     .describe("ExchangeRequest ObjectId")

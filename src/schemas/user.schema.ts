@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 export const createUserSchema = z.object({
-  username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9]+$/),
+  username: z.string().min(1).max(20).regex(/^[a-zA-Z0-9]+$/),
   email: z.email(),
-  bio: z.string().min(10).max(500).optional(),
-  about: z.string().min(10).max(500).optional(),
+  bio: z.string().min(1).max(500).optional(),
+  about: z.string().min(1).max(500).optional(),
   avatar: z.url().optional(),
   tags: z.array(z.string()).optional(),
   passingYear: z.number().nullable().optional(),

@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    minlength: 3,
+    minlength: 1,
     maxlength: 20,
     match: /^[a-zA-Z0-9]+$/,
   },
@@ -17,12 +17,12 @@ const userSchema = new mongoose.Schema({
   },
   bio: {
     type: String,
-    minlength: 10,
+    minlength: 1,
     maxlength: 500,
   },
   about: {
     type: String,
-    minlength: 10,
+    minlength: 1,
     maxlength: 500,
   },
   avatar: {
