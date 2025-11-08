@@ -27,6 +27,12 @@ const exchangeResponseSchema = new mongoose.Schema(
       minlength: 1,
       maxlength: 1000,
     },
+    creditsOffered: {
+      type: Number,
+    },
+    skillsOffered: {
+      type: [String],
+    },
   },
   {
     timestamps: true,

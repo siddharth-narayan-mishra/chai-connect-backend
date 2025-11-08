@@ -17,6 +17,8 @@ import {
 import { ZodError } from "zod";
 import mongoose from "mongoose";
 import type { AuthRequest } from "../middleware/auth.ts";
+import type { ExchangeRequestType } from "@/models/exchangeRequest.model.ts";
+import type { ExchangeRequestSchemaType } from "@/schemas/exchangeRequest.schema.ts";
 
 // ==================== Exchange Requests ====================
 
@@ -373,42 +375,42 @@ export const acceptExchangeResponse = async (
       return;
     }
 
-    const exchangeResponse = await ExchangeResponse.findById(responseId)
-    .exec();
+    const exchangeResponse = await ExchangeResponse.findById(responseId).exec();
+    const exchangeRequest = await ExchangeRequest.findById(
+      exchangeResponse?.exchangeRequest
+    ).exec();
 
     if (!exchangeResponse) {
       res.status(404).json({ message: "Response not found" });
       return;
     }
 
-    const exchangeRequest = exchangeResponse.exchangeRequest as any;
-
-    // Check if user is the requester
-    if (exchangeRequest.requester.toString() !== authReq.user.userId) {
-      res
-        .status(403)
-        .json({ message: "Only the requester can accept responses" });
+    if (authReq.params.id !== exchangeRequest?.creator) {
+      res.status(404).json({ message: "Only creator can reject responses." });
       return;
     }
 
-    if (exchangeResponse.status !== "accepted") {
+    if (exchangeResponse.status !== "pending") {
       res
-        .status(400)
-        .json({ message: "This response is not in accepted status" });
+        .status(404)
+        .json({ message: "Response was already accepted or rejected." });
       return;
     }
 
     // Create exchange session
     const session = new ExchangeSession({
-      exchangeRequest: exchangeRequest._id,
-      requestor: exchangeRequest.requester,
+      exchangeRequest: exchangeRequest?._id,
+      requestor: exchangeRequest?.creator,
       responder: exchangeResponse.responder,
       exchangeDetails: {
-        creditsAmount: exchangeRequest.proposedCredits,
+        creditsAmount: Math.abs(
+          exchangeRequest!.creditsOffered - exchangeRequest!.creditsRequested
+        ),
         creditsPayer:
-          exchangeRequest.proposedCredits > 0
-            ? exchangeRequest.requester
-            : null,
+          exchangeRequest!.creditsOffered - exchangeRequest!.creditsRequested >=
+          0
+            ? exchangeRequest!.creator
+            : exchangeResponse.responder,
       },
       status: "scheduled",
     });
@@ -416,8 +418,8 @@ export const acceptExchangeResponse = async (
     await session.save();
 
     // Update request status
-    exchangeRequest.status = "accepted";
-    await exchangeRequest.save();
+    exchangeResponse.status = "accepted";
+    await exchangeResponse?.save();
 
     res.status(201).json({
       message: "Exchange session created successfully",
@@ -445,31 +447,38 @@ export const rejectExchangeResponse = async (
       return;
     }
 
-    const exchangeResponse = await ExchangeResponse.findById(responseId)
-      .populate("exchangeRequest")
-      .exec();
+    const exchangeResponse = await ExchangeResponse.findById(responseId).exec();
+    const exchangeRequest = await ExchangeRequest.findById(
+      exchangeResponse?.exchangeRequest
+    ).exec();
 
     if (!exchangeResponse) {
       res.status(404).json({ message: "Response not found" });
       return;
     }
 
-    const exchangeRequest = exchangeResponse.exchangeRequest as any;
-
-    if (exchangeRequest.requester.toString() !== authReq.user.userId) {
-      res
-        .status(403)
-        .json({ message: "Only the requester can reject responses" });
+    if (authReq.params.id !== exchangeRequest?.creator) {
+      res.status(404).json({ message: "Only creator can reject responses." });
       return;
     }
 
-    exchangeResponse.status = "rejected";
-    await exchangeResponse.save();
+    if (exchangeResponse.status !== "pending") {
+      res
+        .status(404)
+        .json({ message: "Response was already accepted or rejected." });
+      return;
+    }
 
-    res.status(200).json({ message: "Response rejected successfully" });
+    // Update request status
+    exchangeResponse.status = "rejected";
+    await exchangeResponse?.save();
+
+    res.status(201).json({
+      message: "Response rejected",
+    });
   } catch (error) {
     res.status(500).json({
-      message: "Error rejecting response",
+      message: "Error accepting response",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
@@ -494,26 +503,12 @@ export const getExchangeSessions = async (
     };
 
     if (status) query.status = status;
-
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-
-    const sessions = await ExchangeSession.find(query)
-      .populate("listing", "title skills")
-      .populate("requestor", "username avatar")
-      .populate("responder", "username avatar")
-      .sort({ createdAt: -1 })
-      .limit(limitNum)
-      .skip((pageNum - 1) * limitNum)
-      .lean()
-      .exec();
+    const sessions = await ExchangeSession.find(query).lean().exec();
 
     const count = await ExchangeSession.countDocuments(query).exec();
 
     res.status(200).json({
       sessions,
-      totalPages: Math.ceil(count / limitNum),
-      currentPage: pageNum,
       totalSessions: count,
     });
   } catch (error) {
@@ -541,10 +536,6 @@ export const getExchangeSessionById = async (
     }
 
     const session = await ExchangeSession.findById(authReq.params.id)
-      .populate("listing")
-      .populate("exchangeRequest")
-      .populate("requestor", "username avatar bio skills")
-      .populate("responder", "username avatar bio skills")
       .lean()
       .exec();
 
@@ -739,8 +730,15 @@ export const cancelExchangeSession = async (
       return;
     }
 
-    if (session.status === "completed") {
-      res.status(400).json({ message: "Cannot cancel a completed session" });
+    if (
+      session.status === "completed" ||
+      session.status === "cancelled" ||
+      session.status === "disputed"
+    ) {
+      res.status(400).json({
+        message:
+          "Cannot cancel a session which is not scheduled or in progress",
+      });
       return;
     }
 
@@ -810,14 +808,14 @@ export const createReview = async (
       return;
     }
 
-    const validatedData = reviewSchema.parse({
-      ...authReq.body,
+    const validatedData = reviewSchema.parse(authReq.body);
+
+    const review = new Review({
+      ...validatedData,
       exchangeSession: sessionId,
       reviewer: userId,
       reviewee: revieweeId,
     });
-
-    const review = new Review(validatedData);
     await review.save();
 
     res.status(201).json({
@@ -851,15 +849,7 @@ export const getReviews = async (
     if (reviewee) query.reviewee = reviewee;
     if (session) query.exchangeSession = session;
 
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-
     const reviews = await Review.find(query)
-      .populate("reviewer", "username avatar")
-      .populate("reviewee", "username avatar")
-      .sort({ createdAt: -1 })
-      .limit(limitNum)
-      .skip((pageNum - 1) * limitNum)
       .lean()
       .exec();
 
@@ -867,8 +857,6 @@ export const getReviews = async (
 
     res.status(200).json({
       reviews,
-      totalPages: Math.ceil(count / limitNum),
-      currentPage: pageNum,
       totalReviews: count,
     });
   } catch (error) {

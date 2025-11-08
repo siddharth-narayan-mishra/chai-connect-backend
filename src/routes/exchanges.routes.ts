@@ -67,6 +67,7 @@ exchangesRouter.post(
 // exchange sessions
 exchangesRouter.get("/sessions", auth, getExchangeSessions);
 exchangesRouter.get("/sessions/:id", auth, getExchangeSessionById);
+// can only update start or end dates or status
 exchangesRouter.put("/sessions/:id", auth, updateExchangeSession);
 exchangesRouter.post("/sessions/:id/confirm", auth, confirmExchangeCompletion);
 exchangesRouter.delete("/sessions/:id", auth, cancelExchangeSession);

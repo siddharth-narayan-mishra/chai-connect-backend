@@ -20,30 +20,30 @@ const reviewSchema = new mongoose.Schema(
     rating: {
       type: Number,
       required: true,
-      min: 1,
+      min: 0,
       max: 5,
     },
     skillRating: {
       type: Number,
       required: true,
-      min: 1,
+      min: 0,
       max: 5,
     },
     communicationRating: {
       type: Number,
       required: true,
-      min: 1,
+      min: 0,
       max: 5,
     },
     reliabilityRating: {
       type: Number,
       required: true,
-      min: 1,
+      min: 0,
       max: 5,
     },
     comment: {
       type: String,
-      minlength: 10,
+      minlength: 1,
       maxlength: 1000,
     },
     isPublic: {
@@ -57,10 +57,7 @@ const reviewSchema = new mongoose.Schema(
 );
 
 // Ensure one review per user per exchange session
-reviewSchema.index(
-  { exchangeSession: 1, reviewer: 1 },
-  { unique: true }
-);
+reviewSchema.index({ exchangeSession: 1, reviewer: 1 }, { unique: true });
 reviewSchema.index({ reviewee: 1 });
 
 export const Review = mongoose.model("Review", reviewSchema);
