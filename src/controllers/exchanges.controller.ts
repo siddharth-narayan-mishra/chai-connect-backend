@@ -879,9 +879,6 @@ export const getReviewById = async (
     }
 
     const review = await Review.findById(req.params.id)
-      .populate("reviewer", "username avatar")
-      .populate("reviewee", "username avatar")
-      .populate("exchangeSession")
       .lean()
       .exec();
 
