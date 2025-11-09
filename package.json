@@ -23,6 +23,6 @@
   },
   "scripts": {
     "build": "bun run tsc",
-    "start": "bun run dist/index.js"
+    "start": "bun run src/index.ts"
   }
 }
