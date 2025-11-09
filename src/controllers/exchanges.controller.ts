@@ -17,8 +17,6 @@ import {
 import { ZodError } from "zod";
 import mongoose from "mongoose";
 import type { AuthRequest } from "../middleware/auth.ts";
-import type { ExchangeRequestType } from "@/models/exchangeRequest.model.ts";
-import type { ExchangeRequestSchemaType } from "@/schemas/exchangeRequest.schema.ts";
 
 // ==================== Exchange Requests ====================
 
@@ -269,7 +267,7 @@ export const createExchangeResponse = async (
   try {
     const authReq = req as AuthRequest;
     const requestId = authReq.params.requestId;
-
+    
     if (!requestId || !mongoose.Types.ObjectId.isValid(requestId)) {
       res.status(400).json({ message: "Invalid request ID" });
       return;

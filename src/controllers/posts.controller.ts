@@ -5,7 +5,6 @@ import { ZodError } from "zod";
 import mongoose from "mongoose";
 import type { AuthRequest } from "../middleware/auth.ts";
 
-// Query params interfaces
 interface GetPostsQuery {
   page?: string;
   limit?: string;
