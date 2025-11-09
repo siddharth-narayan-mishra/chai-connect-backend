@@ -2,7 +2,6 @@ import { z } from "zod";
 
 // ISO 8601 date strings (e.g., "2025-12-10T10:00:00Z")
 export const createEventSchema = z.object({
-  creator: z.string().regex(/^[a-f\d]{24}$/i, "Invalid user ID"), // Mongo ObjectId
   title: z
     .string()
     .min(5, "Title must be at least 5 characters")
@@ -15,10 +14,6 @@ export const createEventSchema = z.object({
   }),
   endDate: z.coerce.date().optional(),
   tags: z.array(z.string()).optional().default([]),
-  participants: z
-    .array(z.string().regex(/^[a-f\d]{24}$/i, "Invalid participant ID"))
-    .optional()
-    .default([]),
 });
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;

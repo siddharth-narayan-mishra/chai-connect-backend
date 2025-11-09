@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId format");
-
 export const postSchema = z.object({
   title: z
     .string({
@@ -15,7 +13,7 @@ export const postSchema = z.object({
     .max(40000, "Content cannot exceed 40000 characters")
     .optional(),
 
-  mediaUrl: z.url("Invalid media URL").optional(),
+  mediaUrl: z.url("Invalid media URL").default(""),
 
   voteScore: z.number().default(0),
 

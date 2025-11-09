@@ -271,7 +271,6 @@ export const votePost = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     
-    console.log("Request Body : ", authReq.body);
     const { voteType } = voteSchema.parse(authReq.body);
     const postId = authReq.params.id;
     const userId = authReq.user.userId;
