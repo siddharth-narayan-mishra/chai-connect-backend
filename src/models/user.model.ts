@@ -9,6 +9,12 @@ const userSchema = new mongoose.Schema({
     maxlength: 20,
     match: /^[a-zA-Z0-9]+$/,
   },
+  password: {
+    type: String,
+    required: true,
+    minlength: 1,
+    match: /^[a-zA-Z0-9]+$/,
+  },
   email: {
     type: String,
     required: true,
